@@ -97,7 +97,7 @@ var chatterBox = (function (timerPeriod, numChatsToKeep) {
                             var $temp = $('<li>').text(message);
                             if (isEcho > -1) $temp.addClass('isEcho');
                             if (isRobo > -1) $temp.addClass('isRobo');
-                            $temp.appendTo('ul');
+                            $temp.appendTo('ol.messages');
 
                             // push into the internal array so we can check for duplicates without
                             // continually going to the DOM
@@ -115,7 +115,7 @@ var chatterBox = (function (timerPeriod, numChatsToKeep) {
                 // I assumed (probably wrongly) that Chat.display() should display a single message at a time
                 // so, I iterate the array in UpdateView.  This causes the drawback that I update the DOM once
                 // for each message.  In a refactor, I would create an array of <li> tags, and append the whole
-                // thing to <ul>.
+                // thing to <ol>.
                 case 'fetch':
                     delete Chat.fetch;
                     Chat.fetch = function (fetchCallback) {
@@ -124,16 +124,19 @@ var chatterBox = (function (timerPeriod, numChatsToKeep) {
                             data: {
                                 order: 'createdAt'
                             },
-                            dataType: 'json'
+                            dataType: 'json',
+                            timeout: 2500
                         }).then(function (retrievedData) {
                                 var receivedMessages = retrievedData.results;
                                 var ar = [];
                                 receivedMessages.forEach(function (e, i) {
                                     ar[i] = '(' + e.createdAt.substring(e.createdAt.indexOf('T') + 1, e.createdAt.length - 1) + ') ' + e.text;
                                 });
+                                $("#fetchStatus").removeClass('statusError').addClass('statusOk').html('Ok');
                                 fetchCallback(ar);
                             }, function (error) {
                                 console.warn('ERROR ON FETCH: "' + error.statusText + '"');
+                                $("#fetchStatus").removeClass('statusOk').addClass('statusError').html('Timeout');
                             });
                     };
                     break;
@@ -147,13 +150,16 @@ var chatterBox = (function (timerPeriod, numChatsToKeep) {
                         $.ajax({
                             url: 'https://api.parse.com/1/classes/chats',
                             type: 'POST',
+                            timeout: 2500,
                             data: JSON.stringify({
                                 text: currentUser + ': ' + messageToSend
                             })
                         }).then(function (confirmation) {
                                 console.log('Ajax Sent. Resource ' + confirmation.objectId + ' created at ' + confirmation.createdAt);
+                                $("#sendStatus").removeClass('statusError').addClass('statusOk').html('Ok');
                             }, function (error) {
                                 console.warn('ERROR ON SEND: "' + error.statusText + '"');
+                                $("#sendStatus").removeClass('statusOk').addClass('statusError').html('Timeout');
                             });
                     };
                     break;
@@ -186,6 +192,11 @@ var chatterBox = (function (timerPeriod, numChatsToKeep) {
 
     //  selectively override any of the Chat methods
     overRideDefaults(['display', 'fetch', 'send']);
+
+    // Start up first fetch
+    Chat.fetch(function (fetchedMessages) {
+        updateView(fetchedMessages);
+    });
 
     // Start everything up
     startMonitor(timerPeriod);
